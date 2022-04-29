@@ -7,14 +7,19 @@ enum Error {
 enum TokenType {
     AssignOp,
     Comma,
+    CuBracketClose,
+    CuBracketOpen,
     DoubleQuoteEnd,
     DoubleQuoteStart,
     Ident,
+    IfKeyword,
+    InterfaceKeyword,
     Number,
     SemiColon,
     SqBracketClose,
     SqBracketOpen,
     StringLiteral,
+    StructKeyword,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -61,6 +66,51 @@ fn tokenize(code: &str) -> Result<Vec<Token>, Error> {
                 ty: TokenType::AssignOp,
                 value: None,
             });
+        } else if c == '[' {
+            if current_token.is_some() {
+                tokens.push(current_token.clone().unwrap());
+            }
+            tokens.push(Token {
+                ty: TokenType::SqBracketOpen,
+                value: None,
+            });
+            current_token = None;
+        } else if c == ']' {
+            if current_token.is_some() {
+                tokens.push(current_token.clone().unwrap());
+            }
+            tokens.push(Token {
+                ty: TokenType::SqBracketClose,
+                value: None,
+            });
+            current_token = None;
+        } else if c == '{' {
+            if current_token.is_some() {
+                tokens.push(current_token.clone().unwrap());
+            }
+            tokens.push(Token {
+                ty: TokenType::CuBracketOpen,
+                value: None,
+            });
+            current_token = None;
+        } else if c == '}' {
+            if current_token.is_some() {
+                tokens.push(current_token.clone().unwrap());
+            }
+            tokens.push(Token {
+                ty: TokenType::CuBracketClose,
+                value: None,
+            });
+            current_token = None;
+        } else if c == ',' {
+            if current_token.is_some() {
+                tokens.push(current_token.clone().unwrap());
+            }
+            tokens.push(Token {
+                ty: TokenType::Comma,
+                value: None,
+            });
+            current_token = None;
         } else if (c >= 'A' && c <= 'z' && c != '[' && c != ']')
             || c == '_'
             || (current_token.is_some()
@@ -69,7 +119,31 @@ fn tokenize(code: &str) -> Result<Vec<Token>, Error> {
         {
             if let Some(tok) = &mut current_token {
                 match &mut tok.value {
-                    Some(s) => s.push(c),
+                    Some(s) => {
+                        s.push(c);
+                        if s == "if" {
+                            tokens.push(Token {
+                                ty: TokenType::IfKeyword,
+                                value: None,
+                            });
+                            current_token = None;
+                            continue;
+                        } else if s == "interface" {
+                            tokens.push(Token {
+                                ty: TokenType::InterfaceKeyword,
+                                value: None,
+                            });
+                            current_token = None;
+                            continue;
+                        } else if s == "struct" {
+                            tokens.push(Token {
+                                ty: TokenType::StructKeyword,
+                                value: None,
+                            });
+                            current_token = None;
+                            continue;
+                        }
+                    }
                     None => tok.value = Some(c.to_string()),
                 }
             } else {
@@ -115,33 +189,6 @@ fn tokenize(code: &str) -> Result<Vec<Token>, Error> {
                     value: None,
                 });
             }
-        } else if c == '[' {
-            if current_token.is_some() {
-                tokens.push(current_token.clone().unwrap());
-            }
-            tokens.push(Token {
-                ty: TokenType::SqBracketOpen,
-                value: None,
-            });
-            current_token = None;
-        } else if c == ']' {
-            if current_token.is_some() {
-                tokens.push(current_token.clone().unwrap());
-            }
-            tokens.push(Token {
-                ty: TokenType::SqBracketClose,
-                value: None,
-            });
-            current_token = None;
-        } else if c == ',' {
-            if current_token.is_some() {
-                tokens.push(current_token.clone().unwrap());
-            }
-            tokens.push(Token {
-                ty: TokenType::Comma,
-                value: None,
-            });
-            current_token = None;
         }
     }
     if let Some(tok) = current_token {
@@ -187,8 +234,44 @@ mod tests {
     }
 
     #[test]
+    fn test_assign_struct() {
+        let tokens = tokenize("x = struct{};");
+        assert!(tokens.is_ok());
+        let tokens = tokens.unwrap();
+        assert!(eq_vecs(
+            tokens,
+            vec![
+                Token {
+                    ty: TokenType::Ident,
+                    value: Some(String::from("x")),
+                },
+                Token {
+                    ty: TokenType::AssignOp,
+                    value: None,
+                },
+                Token {
+                    ty: TokenType::StructKeyword,
+                    value: None,
+                },
+                Token {
+                    ty: TokenType::CuBracketOpen,
+                    value: None,
+                },
+                Token {
+                    ty: TokenType::CuBracketClose,
+                    value: None,
+                },
+                Token {
+                    ty: TokenType::SemiColon,
+                    value: None,
+                },
+            ]
+        ));
+    }
+
+    #[test]
     fn string_token() {
-        let tokens = tokenize("\"Hello\"");
+        let tokens = tokenize("\" Hel lo \"");
         assert!(tokens.is_ok());
         let tokens = tokens.unwrap();
         assert!(eq_vecs(
@@ -200,7 +283,7 @@ mod tests {
                 },
                 Token {
                     ty: TokenType::StringLiteral,
-                    value: Some(String::from("Hello")),
+                    value: Some(String::from(" Hel lo ")),
                 },
                 Token {
                     ty: TokenType::DoubleQuoteEnd,
